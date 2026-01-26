@@ -12,6 +12,8 @@ cmd="${1:-}"
 
 if [[ "$cmd" == "update-core" ]]; then
   echo "Updating services-manager-core…"
+  git -C "$CORE_DIR" fetch origin
+  git -C "$CORE_DIR" checkout main
   git -C "$CORE_DIR" pull --ff-only
   git -C "$SCRIPT_DIR" add services-manager-core
   git -C "$SCRIPT_DIR" commit -m "Update services-manager-core"
