@@ -1,0 +1,25 @@
+services:
+
+  # REVERSE PROXY
+  rp.node1.company.com:
+    template: reverse-proxy
+    host: node1.company.com
+    networks:
+      - rp-node1-company-com_net
+      - infisical-company-com_net
+
+  # DOCKER REGISTRY
+  docker.company.com:
+    template: docker-registry
+    host: node1.company.com
+    networks:
+      - rp-node1-company-com_net
+
+  # INFISICAL
+  infisical.company.com:
+    template: infisical
+    host: node1.company.com
+    env:
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    networks:
+      - infisical-company-com_net

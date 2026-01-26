@@ -1,0 +1,58 @@
+name: ${NAME}
+
+services:
+  ${NAME}-db:
+    image: postgres:14.5
+    container_name: ${NAME}-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      ${NETWORKS}
+
+  ${NAME}:
+    image: riggraz/astuto:latest
+    platform: linux/amd64
+    container_name: ${NAME}
+    restart: unless-stopped
+    depends_on:
+      - ${NAME}-db
+    environment:
+      - POSTGRES_HOST=${NAME}-db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - BASE_URL=https://${SERVICE}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - EMAIL_DELIVERY_METHOD=smtp
+      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT}
+      - EMAIL_SMTP_USER=${EMAIL_SMTP_USER}
+      - EMAIL_SMTP_PASS=${EMAIL_SMTP_PASS}
+      - EMAIL_MAIL_FROM=${EMAIL_MAIL_FROM}
+      - EMAIL_SMTP_AUTH=login
+      #- EMAIL_RAISE_DELIVERY_ERRORS=true
+      #- RAILS_LOG_TO_STDOUT=true
+    networks:
+      ${NETWORKS}
+    labels:
+      - "traefik.enable=true"
+      # https router
+      - "traefik.http.routers.${NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${NAME}.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}.tls.certresolver=le"
+      - "traefik.http.services.${NAME}.loadbalancer.server.port=3000"
+      # http → https redirect
+      - "traefik.http.routers.${NAME}-redirect.entrypoints=web"
+      - "traefik.http.routers.${NAME}-redirect.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}-redirect.middlewares=redirect-to-https"
+      # middleware definition
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+volumes:
+  dbdata:
+
+networks:
+  ${NETWORK_DEFINITIONS}

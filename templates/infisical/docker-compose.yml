@@ -1,0 +1,57 @@
+name: ${NAME}
+
+services:
+  ${NAME}:
+    image: infisical/infisical:latest
+    container_name: ${NAME}
+    restart: unless-stopped
+    environment:
+      # Core config
+      NODE_ENV: production
+      SITE_URL: https://${SERVICE}
+
+      # Database (internal postgres service)
+      DATABASE_URL: postgres://infisical:infisical@${NAME}-db:5432/infisical
+
+      # Encryption key (CRITICAL – must be persistent & external)
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+    depends_on:
+      - ${NAME}-db
+
+    networks:
+      ${NETWORKS}
+
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS router
+      - "traefik.http.routers.${NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${NAME}.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}.tls.certresolver=le"
+      - "traefik.http.services.${NAME}.loadbalancer.server.port=3000"
+
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.${NAME}-redirect.entrypoints=web"
+      - "traefik.http.routers.${NAME}-redirect.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}-redirect.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+  ${NAME}-db:
+    image: postgres:15
+    container_name: ${NAME}-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: infisical
+      POSTGRES_DB: infisical
+    volumes:
+      - ${NAME}-db-data:/var/lib/postgresql/data
+    networks:
+      ${NETWORKS}
+
+volumes:
+  ${NAME}-db-data:
+
+networks:
+  ${NETWORK_DEFINITIONS}

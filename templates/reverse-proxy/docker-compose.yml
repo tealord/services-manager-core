@@ -1,0 +1,34 @@
+name: ${NAME}
+
+services:
+  ${NAME}:
+    image: traefik:v2.11
+    container_name: ${NAME}
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--log.level=DEBUG"  
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=1800s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=1800s"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=info@adshots.media"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--accesslog.filepath=/logs/access.log"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./letsencrypt/acme.json:/letsencrypt/acme.json
+      #- ./logs:/logs
+    restart: unless-stopped
+    networks:
+      ${NETWORKS}
+
+networks:
+  ${NETWORK_DEFINITIONS}

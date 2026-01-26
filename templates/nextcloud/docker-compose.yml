@@ -1,0 +1,52 @@
+name: ${NAME}
+
+services:
+  ${NAME}:
+    image: ${SERVICE}:latest
+    container_name: ${NAME}
+    restart: unless-stopped
+    # port mapping runs via traefik
+    #ports:
+    #  - "8080:80"
+    labels:
+      - "traefik.enable=true"
+      # router für https (normal)
+      - "traefik.http.routers.${NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${NAME}.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}.tls.certresolver=le"
+      - "traefik.http.services.${NAME}.loadbalancer.server.port=80"
+      # router für http → redirect auf https
+      - "traefik.http.routers.${NAME}-redirect.entrypoints=web"
+      - "traefik.http.routers.${NAME}-redirect.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}-redirect.middlewares=redirect-to-https"
+      # middleware definition
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    depends_on:
+      - ${NAME}_db
+    volumes:
+      - ./nextcloud_html:/var/www/html
+    networks:
+      ${NETWORKS}
+
+  ${NAME}_db:
+    image: mysql:8.0.39
+    container_name: ${NAME}_db
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - ${NAME}_db_data:/var/lib/mysql
+    # open only for debugging
+    #ports:
+    #  - "3306:3306"
+    networks:
+      ${NETWORKS}
+
+volumes:
+  ${NAME}_db_data:
+
+networks:
+  ${NETWORK_DEFINITIONS}

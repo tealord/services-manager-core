@@ -1,0 +1,27 @@
+name: ${NAME}
+
+services:
+  ${NAME}:
+    image: louislam/uptime-kuma
+    container_name: ${NAME}
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    networks:
+      ${NETWORKS}
+    labels:
+      - "traefik.enable=true"
+      # https router
+      - "traefik.http.routers.${NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${NAME}.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}.tls.certresolver=le"
+      - "traefik.http.services.${NAME}.loadbalancer.server.port=3001"
+      # http → https redirect
+      - "traefik.http.routers.${NAME}-redirect.entrypoints=web"
+      - "traefik.http.routers.${NAME}-redirect.rule=Host(`${SERVICE}`)"
+      - "traefik.http.routers.${NAME}-redirect.middlewares=redirect-to-https"
+      # middleware definition
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+networks:
+  ${NETWORK_DEFINITIONS}

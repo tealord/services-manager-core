@@ -1,0 +1,18 @@
+name: ${NAME}
+
+services:
+  ${NAME}:
+    image: mysql-proxy:${VERSION}
+    container_name: ${NAME}
+    ports:
+      - "127.0.0.1:3306:3306"
+    restart: no
+    networks:
+      ${NETWORKS}
+    environment:
+      TARGET_HOST: ${TARGET_HOST}
+      TARGET_PORT: ${TARGET_PORT}
+      LISTEN_PORT: ${LISTEN_PORT}
+
+networks:
+  ${NETWORK_DEFINITIONS}
