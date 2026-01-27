@@ -6,18 +6,19 @@ services:
     container_name: ${NAME}
     restart: unless-stopped
     environment:
-      # Core config
       NODE_ENV: production
       SITE_URL: https://${SERVICE}
-
-      # Database (internal postgres service)
-      DATABASE_URL: postgres://infisical:infisical@${NAME}-db:5432/infisical
-
-      # Encryption key (CRITICAL – must be persistent & external)
+      DB_CONNECTION_URI: postgres://infisical:infisical@${NAME}-db:5432/infisical
+      REDIS_URL: redis://${NAME}-redis:6379
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      AUTH_SECRET: ${AUTH_SECRET}
+      TELEMETRY_ENABLED: "false"
 
     depends_on:
-      - ${NAME}-db
+      ${NAME}-db:
+        condition: service_healthy
+      ${NAME}-redis:
+        condition: service_started
 
     networks:
       ${NETWORKS}
@@ -29,7 +30,7 @@ services:
       - "traefik.http.routers.${NAME}.entrypoints=websecure"
       - "traefik.http.routers.${NAME}.rule=Host(`${SERVICE}`)"
       - "traefik.http.routers.${NAME}.tls.certresolver=le"
-      - "traefik.http.services.${NAME}.loadbalancer.server.port=3000"
+      - "traefik.http.services.${NAME}.loadbalancer.server.port=8080"
 
       # HTTP → HTTPS redirect
       - "traefik.http.routers.${NAME}-redirect.entrypoints=web"
@@ -47,6 +48,18 @@ services:
       POSTGRES_DB: infisical
     volumes:
       - ${NAME}-db-data:/var/lib/postgresql/data
+    networks:
+      ${NETWORKS}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ${NAME}-redis:
+    image: redis:7
+    container_name: ${NAME}-redis
+    restart: unless-stopped
     networks:
       ${NETWORKS}
 
