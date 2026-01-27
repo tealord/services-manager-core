@@ -53,12 +53,15 @@ git submodule add git@github.com:tealord/services-manager-core.git
 
 Infisical is used as the centralized secrets manager for all services.
 
-#### 1. Generate the encryption key (one-time)
+#### 1. Generate initial ENCRYPTION_KEY and AUTH_SECRET
 
 Infisical requires a persistent encryption key to protect all stored secrets.
 
 ```bash
-openssl rand -hex 32
+# ENCRYPTION_KEY
+openssl rand -hex 16
+# AUTH_SECRET
+openssl rand -base64 32
 ```
 
 **Important**
@@ -79,14 +82,22 @@ services:
     template: infisical
     host: node1.example.com
     env:
-      INFISICAL_ENCRYPTION_KEY: "<generated-key>"
+      ENCRYPTION_KEY: <generated-encryption-key>
+      AUTH_SECRET: <generated-auth-secret>
+    networks:
+      - infisical-example-com_net
 ```
 
 Deploy Infisical:
 
 ```bash
-./services-manager/scripts/deploy.sh infisical.example.com
+./services.sh -s infisical.example.com deploy
+./services.sh -s infisical.example.com start
 ```
+
+**Important**
+
+Disable "Allow user signups" in general settings (infisical.example.com/admin).
 
 ---
 

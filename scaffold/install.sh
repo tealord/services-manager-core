@@ -14,5 +14,6 @@ cp "$SCRIPT_DIR/.gitignore" "$TARGET_DIR/.gitignore"
 cp "$SCRIPT_DIR/services.sh" "$TARGET_DIR/services.sh"
 
 chmod +x "$TARGET_DIR/services.sh"
+mkdir "$TARGET_DIR/templates"
 
 echo "Service Manager scaffold installed in $TARGET_DIR"
