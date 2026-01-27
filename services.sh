@@ -12,7 +12,7 @@ ROOT_DIR="$(realpath "$SCRIPT_DIR/..")"
 source "$SCRIPT_DIR/lib/functions.sh"
 
 # fixed deployment settings
-DEPLOYMENT_FILE="$ROOT_DIR/deployment.yml"
+DEPLOYMENT_FILE="$ROOT_DIR/services.yaml"
 DEPLOY_PREFIX="/opt/docker"
 
 # check requirements
@@ -83,7 +83,7 @@ if [[ -n "$SERVICE" ]]; then
   generate_networks "$SERVICE"
 
   TARGET_DIR="$DEPLOY_PREFIX/$SERVICE"
-  TEMPLATE_DIR="$ROOT_DIR/templates/$TEMPLATE"
+  TEMPLATE_DIR="$(resolve_template_dir "$ROOT_DIR" "$TEMPLATE")"
 fi
 
 # commands

@@ -5,6 +5,39 @@ hostname2dockername() {
   echo "${1//./-}"
 }
 
+# resolve template directory (prefer custom over core)
+#
+# Lookup order:
+#   1) <root>/templates/<template>
+#   2) <root>/services-manager-core/templates/<template>
+#
+# Prints the resolved directory to stdout.
+resolve_template_dir() {
+  local root_dir="${1:-}"
+  local template="${2:-}"
+
+  if [[ -z "$root_dir" || -z "$template" ]]; then
+    echo "error: resolve_template_dir requires: <root_dir> <template>" >&2
+    return 1
+  fi
+
+  local custom_dir="$root_dir/templates/$template"
+  local core_dir="$root_dir/services-manager-core/templates/$template"
+
+  if [[ -d "$custom_dir" ]]; then
+    echo "$custom_dir"
+    return 0
+  fi
+
+  if [[ -d "$core_dir" ]]; then
+    echo "$core_dir"
+    return 0
+  fi
+
+  echo "error: template '$template' not found (checked: $custom_dir, $core_dir)" >&2
+  return 1
+}
+
 # extract and export env vars for given service
 load_env_vars() {
   local service="$1"
