@@ -10,6 +10,8 @@ ROOT_DIR="$(realpath "$SCRIPT_DIR/..")"
 
 # load functions
 source "$SCRIPT_DIR/lib/functions.sh"
+source "$SCRIPT_DIR/lib/infisical_api.sh"
+source "$SCRIPT_DIR/lib/infisical.sh"
 
 # fixed deployment settings
 DEPLOYMENT_FILE="$ROOT_DIR/services.yaml"
@@ -32,6 +34,7 @@ fi
 # default args
 SERVICE=""
 COMMAND=""
+COMMAND_ARGS=()
 
 # parse args
 while [[ $# -gt 0 ]]; do
@@ -49,8 +52,8 @@ while [[ $# -gt 0 ]]; do
         COMMAND="$1"
         shift
       else
-        echo "error: unknown argument: $1"
-        exit 1
+        COMMAND_ARGS+=("$1")
+        shift
       fi
       ;;
   esac
@@ -65,7 +68,7 @@ if [[ -z "$COMMAND" ]]; then
 fi
 
 # commands that require a service
-NEEDS_SERVICE=("build" "push" "deploy" "start" "stop" "restart" "status" "console")
+NEEDS_SERVICE=("build" "push" "deploy" "start" "stop" "restart" "status" "console" "infisical-get" "infisical-set")
 
 # validate service
 if [[ " ${NEEDS_SERVICE[*]} " =~ " $COMMAND " && -z "$SERVICE" ]]; then
@@ -78,10 +81,6 @@ if [[ -n "$SERVICE" ]]; then
   HOST=$(yq -r ".services.\"$SERVICE\".host" "$DEPLOYMENT_FILE")
   TEMPLATE=$(yq -r ".services.\"$SERVICE\".template" "$DEPLOYMENT_FILE")
   VERSION=$(yq -r ".services.\"$SERVICE\".version // \"\"" "$DEPLOYMENT_FILE")
-
-  # Generate networks configuration
-  generate_networks "$SERVICE"
-
   TARGET_DIR="$DEPLOY_PREFIX/$SERVICE"
   TEMPLATE_DIR="$(resolve_template_dir "$ROOT_DIR" "$TEMPLATE")"
 fi
@@ -109,54 +108,34 @@ case "$COMMAND" in
     NAME=$(hostname2dockername "$SERVICE")
     ssh "$HOST" "mkdir -p $TARGET_DIR"
 
-    # pull and tag image
-    if grep "image: ${TEMPLATE}:\${VERSION}" "$TEMPLATE_DIR/docker-compose.yml" >/dev/null 2>&1; then
+    # render and deploy docker-compose.yml
+    DOCKER_COMPOSE="$(render_compose)"
+    base64=$(printf '%s\n' "$DOCKER_COMPOSE" | base64)
+    ssh "$HOST" "echo $base64 | base64 -d > '$TARGET_DIR/docker-compose.yml'"
+
+    # If the template contains a Dockerfile, the image is built locally and pushed to our registry.
+    # Therefore the target host must pull (and tag) the image before running docker compose.
+    if [[ -f "$TEMPLATE_DIR/Dockerfile" ]]; then
       login "$HOST"
       ssh "$HOST" "docker pull $DOCKER_URL/$TEMPLATE:${VERSION}"
       ssh "$HOST" "docker tag $DOCKER_URL/$TEMPLATE:${VERSION} $TEMPLATE:${VERSION}"
       logout "$HOST"
     fi
 
-    # ensure networks exist
-    networks_to_create=()
-
-    # get networks from template
-    if grep "\${NAME}_net" "$TEMPLATE_DIR/docker-compose.yml" >/dev/null 2>&1; then
-        networks_to_create+=("${NAME}_net")
+    # ensure external networks exist
+    external_networks=$(printf '%s\n' "$DOCKER_COMPOSE" \
+      | yq -r '.networks // {} | to_entries[] | select(.value.external == true) | (.value.name // .key)' 2>/dev/null)
+    if [[ -n "$external_networks" ]]; then
+      while IFS= read -r network; do
+        ssh "$HOST" "(docker network inspect \"$network\" >/dev/null 2>&1 || docker network create \"$network\")"
+      done <<< "$external_networks"
     fi
-
-    # get networks from config
-    config_networks=$(yq -r ".services.\"$SERVICE\".networks[]?" "$DEPLOYMENT_FILE" 2>/dev/null)
-    if [[ -n "$config_networks" ]]; then
-        while IFS= read -r network; do
-            networks_to_create+=("$network")
-        done <<< "$config_networks"
-    fi
-
-    # create networks missing networks
-    if [[ ${#networks_to_create[@]} -gt 0 ]]; then
-        for network in "${networks_to_create[@]}"; do
-            ssh "$HOST" "(docker network inspect $network >/dev/null 2>&1 || docker network create $network)"
-        done
-    fi
-
-    # render all .env files
-    for env_file in "$TEMPLATE_DIR"/.env*; do
-        if [[ -f "$env_file" ]]; then
-            env_filename=$(basename "$env_file")
-            echo "[info] rendering $env_filename"
-            load_env_vars "$SERVICE"
-            envsubst_fallback < "$env_file" | ssh "$HOST" "cat > '$TARGET_DIR/$env_filename'"
-        fi
-    done
-
-    # render docker-compose
-    base64=$(render_compose | base64)
-    ssh "$HOST" "echo $base64 | base64 -d > '$TARGET_DIR/docker-compose.yml'"
     ;;
 
   start)
-    ssh "$HOST" "cd $TARGET_DIR && docker compose up -d"
+    infisical_validate_service_env "$SERVICE"
+    ENV_PREFIX=$(infisical_env_prefix "$SERVICE")
+    ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose up -d"
     ;;
 
   stop)
@@ -164,7 +143,21 @@ case "$COMMAND" in
     ;;
 
   restart)
-    ssh "$HOST" "cd $TARGET_DIR && docker compose stop && docker compose up -d"
+    infisical_validate_service_env "$SERVICE"
+    ENV_PREFIX=$(infisical_env_prefix "$SERVICE")
+    ssh "$HOST" "cd $TARGET_DIR && docker compose stop && ${ENV_PREFIX} docker compose up -d"
+    ;;
+
+  infisical-get)
+    infisical_get_service_env "$SERVICE"
+    ;;
+
+  infisical-set)
+    if [[ ${#COMMAND_ARGS[@]} -ne 2 ]]; then
+      echo "usage: $0 -s <service> infisical-set <KEY> <VALUE>"
+      exit 1
+    fi
+    infisical_set_service_env "$SERVICE" "${COMMAND_ARGS[0]}" "${COMMAND_ARGS[1]}"
     ;;
 
   status)
@@ -180,16 +173,18 @@ case "$COMMAND" in
     echo "usage: $0 -s <service> <command>"
     echo ""
     echo "commands:"
-    echo "  list         list available templates"
-    echo "  build        build docker image for service"
-    echo "  push         push docker image to registry"
-    echo "  deploy       deploy service to remote host"
-    echo "  start        start service remotely"
-    echo "  stop         stop service remotely"
-    echo "  restart      restart service remotely"
-    echo "  status       show remote service status"
-    echo "  console      open bash console in service container"
-    echo "  help         show this help"
+    echo "  list          list available templates"
+    echo "  build         build docker image for service"
+    echo "  push          push docker image to registry"
+    echo "  deploy        deploy service to remote host"
+    echo "  start         start service remotely"
+    echo "  stop          stop service remotely"
+    echo "  restart       restart service remotely"
+    echo "  status        show remote service status"
+    echo "  console       open bash console in service container"
+    echo "  infisical-get show infisical env vars for service"
+    echo "  infisical-set set infisical env var for service"
+    echo "  help          show this help"
     echo ""
     echo "options:"
     echo "  -s, --service <name>  specify the service fqdn"

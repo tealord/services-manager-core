@@ -21,5 +21,6 @@ services:
     host: node1.company.com
     env:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      AUTH_SECRET: ${AUTH_SECRET}
     networks:
       - infisical-company-com_net

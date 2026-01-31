@@ -8,7 +8,7 @@ services:
     environment:
       NODE_ENV: production
       SITE_URL: https://${SERVICE}
-      DB_CONNECTION_URI: postgres://infisical:infisical@${NAME}-db:5432/infisical
+      DB_CONNECTION_URI: postgres://${POSTGRES_USER:-infisical}:${POSTGRES_PASSWORD:-infisical}@${NAME}-db:5432/${POSTGRES_DB:-infisical}
       REDIS_URL: redis://${NAME}-redis:6379
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       AUTH_SECRET: ${AUTH_SECRET}
@@ -43,15 +43,15 @@ services:
     container_name: ${NAME}-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: infisical
-      POSTGRES_PASSWORD: infisical
-      POSTGRES_DB: infisical
+      POSTGRES_USER: ${POSTGRES_USER:-infisical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infisical}
+      POSTGRES_DB: ${POSTGRES_DB:-infisical}
     volumes:
       - ${NAME}-db-data:/var/lib/postgresql/data
     networks:
       ${NETWORKS}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-infisical} -d ${POSTGRES_DB:-infisical}"]
       interval: 5s
       timeout: 5s
       retries: 10

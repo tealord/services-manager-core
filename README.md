@@ -95,9 +95,50 @@ Deploy Infisical:
 ./services.sh -s infisical.example.com start
 ```
 
-**Important**
+## Infisical: UI setup + credentials for this repo
 
-Disable "Allow user signups" in general settings (infisical.example.com/admin).
+After deploying Infisical and logging into the UI, configure it so this repo can authenticate via Universal Auth.
+
+### 1) Disable public signups
+
+For production deployments, disable user self-signups:
+
+- Open the admin UI at `https://infisical.example.com/admin`
+- In **General settings**, disable **Allow user signups**
+
+### 2) Create a project and copy the Project ID
+
+Create (or select) the project that will store your secrets:
+
+- **Organization** → **Overview** → **Add new Project**
+- Go to **Project** → **Settings** → **General**
+- Copy the **Project ID**
+- Store it in your local `.env` as `INFISICAL_WORKSPACE_ID`
+
+### 3) Create a Machine Identity (Universal Auth)
+
+Create an organization-level machine identity for automated access (example name: `services-manager`):
+
+- **Organization** → **Access Control** → **Machine Identities**
+- **Create Organization Machine Identity**
+- In the created identity, open **Universal Auth**
+- Copy the **Client ID**
+- Create a **Client Secret** and copy it
+
+### 4) Grant the Machine Identity access to the project
+
+Add the Machine Identity to your Infisical project with sufficient permissions (typically **Admin** for initial setup).
+
+### 5) Configure this repo via `.env`
+
+Add the following variables to your local `.env` (do not commit this file):
+
+```bash
+INFISICAL_URL=https://infisical.example.com
+INFISICAL_CLIENT_ID=xxx
+INFISICAL_CLIENT_SECRET=xxx
+INFISICAL_WORKSPACE_ID=xxx
+```
 
 ---
 

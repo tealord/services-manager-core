@@ -38,18 +38,36 @@ resolve_template_dir() {
   return 1
 }
 
-# extract and export env vars for given service
-load_env_vars() {
-  local service="$1"
-  local env_exists
-  env_exists=$(yq ".services.\"$service\".env" "$DEPLOYMENT_FILE")
-  
-  if [[ "$env_exists" != "null" ]]; then
-    local keys
-    keys=$(yq ".services.\"$service\".env | keys | .[]" "$DEPLOYMENT_FILE")
-    for key in $keys; do
-      export "$key"=$(yq -r ".services.\"$service\".env.\"$key\"" "$DEPLOYMENT_FILE")
-    done
+# protect_reserved_env_vars: fail-fast guard for reserved/base variables.
+# These variables are used internally for templating and/or orchestration.
+#
+# Usage:
+#   protect_reserved_env_vars <service>
+protect_reserved_env_vars() {
+  local service="${1:-}"
+  local reserved=(
+    "NAME"
+    "SERVICE"
+    "VERSION"
+    "NETWORKS"
+    "NETWORK_DEFINITIONS"
+  )
+
+  local keys
+  keys=$(yq -r ".services.\"$service\".env // {} | keys | .[]" "$DEPLOYMENT_FILE" 2>/dev/null || true)
+
+  local conflicts=()
+  local r
+  for r in "${reserved[@]}"; do
+    if [[ -n "$keys" ]] && printf '%s\n' "$keys" | grep -Fxq "$r"; then
+      conflicts+=("$r")
+    fi
+  done
+
+  if (( ${#conflicts[@]} > 0 )); then
+    echo "error: services.yaml env for '$service' contains reserved keys: ${conflicts[*]}" >&2
+    echo "hint: these keys are reserved for internal templating/orchestration; please rename them." >&2
+    return 1
   fi
 }
 
@@ -73,11 +91,21 @@ logout() {
   fi
 }
 
-# render_compose function
+# render_compose: render compose from template for the current service.
+#
+# Current refactor goal:
+# - Apply only system/base substitutions (NAME/SERVICE/VERSION/NETWORKS/NETWORK_DEFINITIONS)
+# - Do NOT substitute service-specific env vars from services.yaml
+# - Apply modify_compose after substitution
 render_compose() {
-  load_env_vars "$SERVICE"
-  
-  # Generate base compose content
+  protect_reserved_env_vars "$SERVICE"
+
+  local NETWORKS
+  local NETWORK_DEFINITIONS
+  NETWORKS="$(generate_networks "$SERVICE")"
+  NETWORK_DEFINITIONS="$(generate_network_definitions "$SERVICE")"
+
+  # Generate base compose content (system vars only)
   local base_compose
   base_compose=$(env \
     NAME="$NAME" \
@@ -85,44 +113,58 @@ render_compose() {
     VERSION="$VERSION" \
     NETWORKS="$NETWORKS" \
     NETWORK_DEFINITIONS="$NETWORK_DEFINITIONS" \
-    envsubst < "$TEMPLATE_DIR/docker-compose.yml")
-  
+    envsubst "\$NAME \$SERVICE \$VERSION \$NETWORKS \$NETWORK_DEFINITIONS" < "$TEMPLATE_DIR/docker-compose.yml")
+
   # Apply compose modifications
   modify_compose "$SERVICE" "$base_compose"
 }
 
-# Generate networks configuration for docker-compose
+# generate_networks: generates the YAML list fragment used under `services.<svc>.networks:`
+# Returns a multi-line string, intended to be inserted at 6-space indentation level.
 generate_networks() {
   local service="$1"
-  local networks_list
-  
-  NETWORKS=""
-  NETWORK_DEFINITIONS=""
-  
-  networks_list=$(yq -r ".services.\"$service\".networks[]?" "$DEPLOYMENT_FILE" 2>/dev/null)
-  
-  if [[ -n "$networks_list" ]]; then
-    local first_network=true
-    local first_definition=true
-    
-    while IFS= read -r network; do
-      # Networks for services section
-      if [[ "$first_network" == true ]]; then
-        NETWORKS+="- $network"
-        first_network=false
-      else
-        NETWORKS+=$'\n'"      - $network"
-      fi
-      
-      # Network definitions for networks section
-      if [[ "$first_definition" == true ]]; then
-        NETWORK_DEFINITIONS+="$network:"$'\n'"    external: true"
-        first_definition=false
-      else
-        NETWORK_DEFINITIONS+=$'\n'"  $network:"$'\n'"    external: true"
-      fi
-    done <<< "$networks_list"
-  fi
+
+  local out=""
+  local first_network=true
+
+  while IFS= read -r network; do
+    if [[ -z "$network" || "$network" == "null" ]]; then
+      continue
+    fi
+
+    if [[ "$first_network" == true ]]; then
+      out+="- $network"
+      first_network=false
+    else
+      out+=$'\n'"      - $network"
+    fi
+  done < <(yq -r ".services.\"$service\".networks[]?" "$DEPLOYMENT_FILE" 2>/dev/null || true)
+
+  printf '%s' "$out"
+}
+
+# generate_network_definitions: generates the YAML map fragment used under top-level `networks:`
+# Returns a multi-line string, intended to be inserted at 2-space indentation level.
+generate_network_definitions() {
+  local service="$1"
+
+  local out=""
+  local first_definition=true
+
+  while IFS= read -r network; do
+    if [[ -z "$network" || "$network" == "null" ]]; then
+      continue
+    fi
+
+    if [[ "$first_definition" == true ]]; then
+      out+="$network:"$'\n'"    external: true"
+      first_definition=false
+    else
+      out+=$'\n'"  $network:"$'\n'"    external: true"
+    fi
+  done < <(yq -r ".services.\"$service\".networks[]?" "$DEPLOYMENT_FILE" 2>/dev/null || true)
+
+  printf '%s' "$out"
 }
 
 # modify_compose function
@@ -141,25 +183,4 @@ modify_compose() {
   done < <(echo "$add_entries" | jq -r 'to_entries[] | @base64')
 
   echo "$compose_content"
-}
-
-# envsubst_fallback: expand ${VAR} and ${VAR:-default} using current shell env
-# Usage:
-#   envsubst_fallback < input.tpl > output
-#   envsubst_fallback path/to/input.tpl > output
-# Notes:
-# - Uses Bash parameter expansion via eval per line to support :- fallback.
-# - Template lines must not contain command substitutions or arbitrary code.
-# - Intended for controlled template files only.
-envsubst_fallback() {
-  local _file="${1:-}"
-  if [[ -n "$_file" ]]; then
-    while IFS= read -r _line; do
-      eval "printf '%s\\n' \"$_line\""
-    done < "$_file"
-  else
-    while IFS= read -r _line; do
-      eval "printf '%s\\n' \"$_line\""
-    done
-  fi
 }
