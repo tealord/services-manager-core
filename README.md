@@ -84,6 +84,7 @@ services:
     env:
       ENCRYPTION_KEY: <generated-encryption-key>
       AUTH_SECRET: <generated-auth-secret>
+      POSTGRES_PASSWORD: <password>
     networks:
       - infisical-example-com_net
 ```
@@ -142,19 +143,17 @@ INFISICAL_WORKSPACE_ID=xxx
 
 ---
 
-#### 3. Store the encryption key in Infisical
+#### 3. Store the secret env in Infisical
 
 Once Infisical is running:
 
-1. Log in to the Infisical UI
-2. Create a secure secret:
+```bash
+./services.sh -s infisical.example.com infisical-set ENCRYPTION_KEY xxx
+./services.sh -s infisical.example.com infisical-set AUTH_SECRET xxx
+./services.sh -s infisical.example.com infisical-set POSTGRES_PASSWORD xxx
+```
 
-   ```
-   INFISICAL_ENCRYPTION_KEY
-   ```
-3. Store the same encryption key value
-
-From this point on, Infisical can provide the encryption key during deployments.
+From this point on, Infisical can provide the secret env during deployments.
 
 ---
 
@@ -168,7 +167,14 @@ services:
     template: infisical
     host: node1.example.com
     env:
-      INFISICAL_ENCRYPTION_KEY: ${INFISICAL_ENCRYPTION_KEY}
+      ENCRYPTION_KEY:
+        from: infisical
+      AUTH_SECRET:
+        from: infisical
+      POSTGRES_PASSWORD:
+        from: infisical
+    networks:
+      - infisical-example-com_net
 ```
 
 Redeploy Infisical:
