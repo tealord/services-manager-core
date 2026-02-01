@@ -6,7 +6,7 @@ services:
     container_name: ${NAME}-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_USER=${POSTGRES_USER:-astuto}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - dbdata:/var/lib/postgresql/data
@@ -22,7 +22,7 @@ services:
       - ${NAME}-db
     environment:
       - POSTGRES_HOST=${NAME}-db
-      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_USER=${POSTGRES_USER:-astuto}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - BASE_URL=https://${SERVICE}
       - SECRET_KEY_BASE=${SECRET_KEY_BASE}
