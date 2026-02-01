@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-_shell_escape_single_quotes() {
-  local s="$1"
-  s=${s//\'/\'"\'"\'}
-  printf "'%s'" "$s"
-}
-
 infisical_list_env_vars() {
   local service="$1"
   yq -r ".services.\"$service\".env // {} | to_entries[] | select(.value.from == \"infisical\") | .key" "$DEPLOYMENT_FILE"

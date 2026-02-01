@@ -71,6 +71,36 @@ protect_reserved_env_vars() {
   fi
 }
 
+_shell_escape_single_quotes() {
+  local s="$1"
+  s=${s//\'/\'"\'"\'}
+  printf "'%s'" "$s"
+}
+
+# service_scalar_env_prefix: build an environment prefix from scalar env values in services.yaml.
+# - Includes only non-map values (i.e. not `{from: infisical}` objects)
+service_scalar_env_prefix() {
+  local service="$1"
+  local prefix=""
+
+  local key
+  while IFS= read -r key; do
+    local raw
+    raw=$(yq -r ".services.\"$service\".env.\"$key\"" "$DEPLOYMENT_FILE")
+    prefix+="$key=$(_shell_escape_single_quotes "$raw") "
+  done < <(yq -r ".services.\"$service\".env // {} | to_entries[] | select(.value | type != \"!!map\") | .key" "$DEPLOYMENT_FILE")
+
+  printf '%s' "$prefix"
+}
+
+# service_env_prefix: build the full runtime env prefix for docker compose.
+# Combines scalar services.yaml env values and Infisical-mapped secrets.
+service_env_prefix() {
+  local service="$1"
+
+  printf '%s%s' "$(service_scalar_env_prefix "$service")" "$(infisical_env_prefix "$service")"
+}
+
 # login to docker registry (local or remote)
 login() {
   echo "[info] logging in to registry"

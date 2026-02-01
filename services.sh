@@ -134,7 +134,7 @@ case "$COMMAND" in
 
   start)
     infisical_validate_service_env "$SERVICE"
-    ENV_PREFIX=$(infisical_env_prefix "$SERVICE")
+    ENV_PREFIX=$(service_env_prefix "$SERVICE")
     ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose up -d"
     ;;
 
@@ -144,7 +144,7 @@ case "$COMMAND" in
 
   restart)
     infisical_validate_service_env "$SERVICE"
-    ENV_PREFIX=$(infisical_env_prefix "$SERVICE")
+    ENV_PREFIX=$(service_env_prefix "$SERVICE")
     ssh "$HOST" "cd $TARGET_DIR && docker compose stop && ${ENV_PREFIX} docker compose up -d"
     ;;
 
