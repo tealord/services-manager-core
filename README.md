@@ -194,6 +194,69 @@ Redeploy Infisical:
 
 ### Deploy and configure Docker Registry
 
+If your services repository contains **custom builds** (i.e. you build images locally and deploy them to remote hosts), you need a **Docker registry** so the remote host can pull the exact image version you built.
+
+This repository ships a ready-to-use registry template (`docker-registry`).
+
+#### 1. Add the registry service to `services.yaml`
+
+Example:
+
+```yaml
+services:
+  # DOCKER REGISTRY
+  docker.company.com:
+    template: docker-registry
+    host: node1.company.com
+    networks:
+      - rp-node1-company-com_net
+```
+
+#### 2. Deploy and start the registry
+
+```bash
+./services.sh -s docker.company.com deploy
+./services.sh -s docker.company.com start
+```
+
+#### 3. Configure registry credentials (htpasswd)
+
+The registry uses basic auth via an `htpasswd` file on the target host.
+
+On your machine, generate an entry (replace `docker` with your desired username):
+
+```bash
+htpasswd -Bn docker
+```
+
+Copy the output into the `htpasswd` file on the target host:
+
+- Path: `/opt/docker/docker.company.com/auth/htpasswd`
+
+#### 4. Configure this repo to use the registry
+
+Add the registry access details to your local `.env` (do not commit):
+
+```bash
+# DOCKER REGISTRY
+DOCKER_URL=docker.company.com
+DOCKER_USER=docker
+DOCKER_PASS=your-password
+```
+
+These variables are used by the `login`/`logout` flow during `push` and during remote `deploy` when a template contains a `Dockerfile`.
+
+#### 5. (Optional) Store registry credentials in Infisical
+
+If you want an additional layer of safety and documentation, you can also store the credentials in Infisical.
+
+Important: This **does not replace** the local `.env` values. The Service Manager still relies on `DOCKER_URL`, `DOCKER_USER`, and `DOCKER_PASS` from `.env` for registry login/push/pull.
+
+```bash
+./services.sh -s docker.company.com infisical-set DOCKER_USER docker
+./services.sh -s docker.company.com infisical-set DOCKER_PASS your-password
+```
+
 ---
 
 ## Recommended structure for your services repository
