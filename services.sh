@@ -83,6 +83,8 @@ if [[ -n "$SERVICE" ]]; then
   VERSION=$(yq -r ".services.\"$SERVICE\".version // \"\"" "$DEPLOYMENT_FILE")
   TARGET_DIR="$DEPLOY_PREFIX/$SERVICE"
   TEMPLATE_DIR="$(resolve_template_dir "$ROOT_DIR" "$TEMPLATE")"
+  infisical_validate_service_env "$SERVICE"
+  ENV_PREFIX=$(service_env_prefix "$SERVICE")
 fi
 
 # commands
@@ -133,19 +135,15 @@ case "$COMMAND" in
     ;;
 
   start)
-    infisical_validate_service_env "$SERVICE"
-    ENV_PREFIX=$(service_env_prefix "$SERVICE")
     ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose up -d"
     ;;
 
   stop)
-    ssh "$HOST" "cd $TARGET_DIR && docker compose stop"
+    ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose stop"
     ;;
 
   restart)
-    infisical_validate_service_env "$SERVICE"
-    ENV_PREFIX=$(service_env_prefix "$SERVICE")
-    ssh "$HOST" "cd $TARGET_DIR && docker compose stop && ${ENV_PREFIX} docker compose up -d"
+    ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose stop && ${ENV_PREFIX} docker compose up -d"
     ;;
 
   infisical-get)
@@ -161,12 +159,12 @@ case "$COMMAND" in
     ;;
 
   status)
-    ssh "$HOST" "cd $TARGET_DIR && docker compose ps"
+    ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose ps"
     ;;
 
   console)
     NAME=$(hostname2dockername "$SERVICE")
-    ssh -t "$HOST" "cd $TARGET_DIR && docker compose -f $TARGET_DIR/docker-compose.yml exec --user root $NAME sh"
+    ssh -t "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose -f $TARGET_DIR/docker-compose.yml exec --user root $NAME sh"
     ;;
 
   help)
