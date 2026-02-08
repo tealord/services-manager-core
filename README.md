@@ -42,7 +42,7 @@ cd company-services
 
 ```bash
 git submodule add git@github.com:tealord/services-manager-core.git
-./services-manager-core/scaffold/install.sh
+bash ./services-manager-core/scaffold/install.sh
 ```
 
 ### Server side setup
