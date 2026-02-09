@@ -253,7 +253,8 @@ services:
 Redeploy Infisical:
 
 ```bash
-./services-manager/scripts/deploy.sh infisical.example.com
+./services.sh -s infisical.example.com deploy
+./services.sh -s infisical.example.com restart
 ```
 
 ---
