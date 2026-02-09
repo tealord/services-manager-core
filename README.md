@@ -47,7 +47,73 @@ bash ./services-manager-core/scaffold/install.sh
 
 ### Server side setup
 
+> TODO: Complete the server-side setup documentation. All services are deployed under `/opt/docker`.
+
 ### Deploy and configure Reverse Proxy
+
+The reverse proxy provides HTTPS/SSL termination and routing for all HTTP services.
+
+#### 1. Add the reverse proxy to `services.yaml`
+
+```yaml
+services:
+  rp.node1.example.com:
+    template: reverse-proxy
+    host: node1.example.com
+    networks:
+      - rp-node1-example-com_net
+```
+
+#### 2. Deploy and start the reverse proxy
+
+```bash
+./services.sh -s rp.node1.example.com deploy
+./services.sh -s rp.node1.example.com start
+```
+
+#### 3. Network configuration
+
+There are two common cases for service networking:
+
+**A) Simple service (no dedicated network needed)**
+
+If a service only needs to be reachable via the reverse proxy and has no other network dependencies, you can attach it directly to the reverse proxy network:
+
+```yaml
+services:
+  app.example.com:
+    template: my-app
+    host: node1.example.com
+    networks:
+      - rp-node1-example-com_net
+```
+
+**B) Complex service (dedicated network required)**
+
+If a service has its own internal network (e.g. database, cache, private backends), you must:
+
+1. Add the service network to the service itself
+2. Also attach that network to the reverse proxy service so it can reach the container
+
+Example:
+
+```yaml
+services:
+  rp.node1.example.com:
+    template: reverse-proxy
+    host: node1.example.com
+    networks:
+      - rp-node1-example-com_net
+      - app-example-com_net
+
+  app.example.com:
+    template: my-app
+    host: node1.example.com
+    networks:
+      - app-example-com_net
+```
+
+This ensures Traefik (reverse proxy) can route to services across the correct Docker networks.
 
 ### Deploy and configure Infisical
 
@@ -94,6 +160,13 @@ Deploy Infisical:
 ```bash
 ./services.sh -s infisical.example.com deploy
 ./services.sh -s infisical.example.com start
+```
+
+**Important:** after Infisical is up, add its network to the reverse proxy service (as described above), then redeploy/restart the reverse proxy so it can route to Infisical over that network:
+
+```bash
+./services.sh -s rp.node1.example.com deploy
+./services.sh -s rp.node1.example.com restart
 ```
 
 ## Infisical: UI setup + credentials for this repo
