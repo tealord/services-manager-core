@@ -164,7 +164,8 @@ case "$COMMAND" in
 
   console)
     NAME=$(hostname2dockername "$SERVICE")
-    ssh -t "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose -f $TARGET_DIR/docker-compose.yml exec --user root $NAME sh"
+    CONSOLE_SERVICE=$(ssh "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose -f $TARGET_DIR/docker-compose.yml ps --format '{{.Service}}'" | head -1)
+    ssh -t "$HOST" "cd $TARGET_DIR && ${ENV_PREFIX} docker compose -f $TARGET_DIR/docker-compose.yml exec --user root $CONSOLE_SERVICE sh"
     ;;
 
   help)
