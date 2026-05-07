@@ -2,7 +2,7 @@ name: ${NAME}
 
 services:
   ${NAME}:
-    image: traefik:v2.11
+    image: traefik:v3.7.0
     container_name: ${NAME}
     command:
       - "--api.dashboard=true"
