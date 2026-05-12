@@ -80,7 +80,11 @@ fi
 if [[ -n "$SERVICE" ]]; then
   HOST=$(yq -r ".services.\"$SERVICE\".host" "$DEPLOYMENT_FILE")
   TEMPLATE=$(yq -r ".services.\"$SERVICE\".template" "$DEPLOYMENT_FILE")
+  IMAGE=$(yq -r ".services.\"$SERVICE\".image // \"\"" "$DEPLOYMENT_FILE")
   VERSION=$(yq -r ".services.\"$SERVICE\".version // \"\"" "$DEPLOYMENT_FILE")
+  # set fallback values
+  IMAGE="${IMAGE:-$TEMPLATE}"
+  VERSION="${VERSION:-latest}"
   TARGET_DIR="$DEPLOY_PREFIX/$SERVICE"
   TEMPLATE_DIR="$(resolve_template_dir "$ROOT_DIR" "$TEMPLATE")"
   infisical_validate_service_env "$SERVICE"
@@ -119,8 +123,8 @@ case "$COMMAND" in
     # Therefore the target host must pull (and tag) the image before running docker compose.
     if [[ -f "$TEMPLATE_DIR/Dockerfile" ]]; then
       login "$HOST"
-      ssh "$HOST" "docker pull $DOCKER_URL/$TEMPLATE:${VERSION}"
-      ssh "$HOST" "docker tag $DOCKER_URL/$TEMPLATE:${VERSION} $TEMPLATE:${VERSION}"
+      ssh "$HOST" "docker pull $DOCKER_URL/$IMAGE:$VERSION"
+      ssh "$HOST" "docker tag $DOCKER_URL/$IMAGE:$VERSION $IMAGE:$VERSION"
       logout "$HOST"
     fi
 

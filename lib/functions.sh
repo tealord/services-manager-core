@@ -48,6 +48,7 @@ protect_reserved_env_vars() {
   local reserved=(
     "NAME"
     "SERVICE"
+    "IMAGE"
     "VERSION"
     "NETWORKS"
     "NETWORK_DEFINITIONS"
@@ -124,7 +125,7 @@ logout() {
 # render_compose: render compose from template for the current service.
 #
 # Current refactor goal:
-# - Apply only system/base substitutions (NAME/SERVICE/VERSION/NETWORKS/NETWORK_DEFINITIONS)
+# - Apply only system/base substitutions (NAME/SERVICE/IMAGE/VERSION/NETWORKS/NETWORK_DEFINITIONS)
 # - Do NOT substitute service-specific env vars from services.yaml
 # - Apply modify_compose after substitution
 render_compose() {
@@ -140,10 +141,11 @@ render_compose() {
   base_compose=$(env \
     NAME="$NAME" \
     SERVICE="$SERVICE" \
+    IMAGE="$IMAGE" \
     VERSION="$VERSION" \
     NETWORKS="$NETWORKS" \
     NETWORK_DEFINITIONS="$NETWORK_DEFINITIONS" \
-    envsubst "\$NAME \$SERVICE \$VERSION \$NETWORKS \$NETWORK_DEFINITIONS" < "$TEMPLATE_DIR/docker-compose.yml")
+    envsubst "\$NAME \$SERVICE \$IMAGE \$VERSION \$NETWORKS \$NETWORK_DEFINITIONS" < "$TEMPLATE_DIR/docker-compose.yml")
 
   # Apply compose modifications
   modify_compose "$SERVICE" "$base_compose"
