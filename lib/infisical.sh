@@ -9,6 +9,9 @@ infisical_validate_service_env() {
   local service="$1"
   local ignore_env_var="${2:-}"
 
+  local secrets_json
+  secrets_json=$(infisical_list_secrets "$service")
+
   local missing=()
 
   local env_var
@@ -19,9 +22,10 @@ infisical_validate_service_env() {
     local secret_key
     secret_key=$(yq -r ".services.\"$service\".env.\"$env_var\".key // \"$env_var\"" "$DEPLOYMENT_FILE")
 
-    if ! infisical_get "$secret_key" "$service" >/dev/null 2>&1; then
-      missing+=("$env_var")
-    fi
+    local val
+    val=$(echo "$secrets_json" | jq -r --arg k "$secret_key" '.secrets[]? | select(.secretKey==$k) | .secretValue // empty')
+
+    [[ -z "$val" ]] && missing+=("$env_var")
   done < <(infisical_list_env_vars "$service")
 
   if [[ ${#missing[@]} -gt 0 ]]; then
@@ -36,6 +40,9 @@ infisical_env_prefix() {
   local service="$1"
   local prefix=""
 
+  local secrets_json
+  secrets_json=$(infisical_list_secrets "$service")
+
   local env_var
   while IFS= read -r env_var; do
     [[ -z "$env_var" ]] && continue
@@ -44,7 +51,7 @@ infisical_env_prefix() {
     secret_key=$(yq -r ".services.\"$service\".env.\"$env_var\".key // \"$env_var\"" "$DEPLOYMENT_FILE")
 
     local secret_value
-    secret_value=$(infisical_get "$secret_key" "$service")
+    secret_value=$(echo "$secrets_json" | jq -r --arg k "$secret_key" '.secrets[]? | select(.secretKey==$k) | .secretValue // empty')
 
     prefix+="$env_var=$(_shell_escape_single_quotes "$secret_value") "
   done < <(infisical_list_env_vars "$service")

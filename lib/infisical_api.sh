@@ -4,6 +4,9 @@ set -euo pipefail
 # fixed environment
 INFISICAL_ENV="prod"
 
+# token cache – valid for the lifetime of the current script invocation
+_INFISICAL_TOKEN=""
+
 _infisical_load_env() {
   local env_file
   env_file="$(realpath "$(dirname "${BASH_SOURCE[0]}")/../../.env")"
@@ -49,9 +52,10 @@ _infisical_login() {
 }
 
 _infisical_auth_header() {
-  local token
-  token="$(_infisical_login)"
-  printf 'Authorization: Bearer %s' "$token"
+  if [[ -z "$_INFISICAL_TOKEN" ]]; then
+    _INFISICAL_TOKEN="$(_infisical_login)"
+  fi
+  printf 'Authorization: Bearer %s' "$_INFISICAL_TOKEN"
 }
 
 _infisical_uri_encode() {
