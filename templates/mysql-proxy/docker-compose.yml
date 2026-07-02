@@ -5,7 +5,7 @@ services:
     image: mysql-proxy:${VERSION}
     container_name: ${NAME}
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:${LISTEN_PORT}:${LISTEN_PORT}"
     restart: no
     networks:
       ${NETWORKS}
