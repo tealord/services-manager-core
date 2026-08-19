@@ -87,8 +87,13 @@ if [[ -n "$SERVICE" ]]; then
   VERSION="${VERSION:-latest}"
   TARGET_DIR="$DEPLOY_PREFIX/$SERVICE"
   TEMPLATE_DIR="$(resolve_template_dir "$ROOT_DIR" "$TEMPLATE")"
-  infisical_validate_service_env "$SERVICE"
-  ENV_PREFIX=$(service_env_prefix "$SERVICE")
+  # infisical commands manage the secrets themselves — validating here would
+  # block setting a key that does not exist yet (chicken-and-egg)
+  ENV_PREFIX=""
+  if [[ "$COMMAND" != infisical-* ]]; then
+    infisical_validate_service_env "$SERVICE"
+    ENV_PREFIX=$(service_env_prefix "$SERVICE")
+  fi
 fi
 
 # commands
